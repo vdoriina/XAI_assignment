@@ -1,0 +1,69 @@
+#SHAP
+import pandas as pd
+import numpy as np
+import shap
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+#load data
+df = pd.read_csv("downloads/diabetes.csv")
+X = df.drop("Outcome", axis=1)
+y = df["Outcome"]
+
+#train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+#reveal accuracy
+y_pred = model.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+
+explainer = shap.TreeExplainer(model)
+shap_val = explainer(X_test)
+shap_values=shap_val [:, :, 1]
+#beeswarm plot
+shap.plots.beeswarm(shap_values)
+
+#bar plot
+shap.plots.bar(shap_values)
+
+#local explanation
+shap.plots.waterfall(shap_values[0])
+
+
+
+#Counterfactual Explanations
+import dice_ml
+from dice_ml import Dice
+import matplotlib.pyplot as plt
+
+data_dice = dice_ml.Data(dataframe=df,continuous_features=list(X.columns),outcome_name="Outcome")
+model_dice = dice_ml.Model(model=model,backend="sklearn")
+dice = Dice(data_dice, model_dice, method="random")
+
+
+query_instance = X_test.iloc[0:1]
+
+#Counterfactual
+cf = dice.generate_counterfactuals(query_instance,total_CFs=2,desired_class="opposite")
+
+#visualization
+cf.visualize_as_dataframe()
+
+#plot
+
+#original instance
+original = query_instance.iloc[0]
+
+#counterfactual
+cf_example = cf.cf_examples_list[0].final_cfs_df.iloc[0].drop("Outcome")
+features = original.index
+plt.figure()
+plt.bar(features, cf_example.values - original.values)
+plt.xticks()
+plt.show()
